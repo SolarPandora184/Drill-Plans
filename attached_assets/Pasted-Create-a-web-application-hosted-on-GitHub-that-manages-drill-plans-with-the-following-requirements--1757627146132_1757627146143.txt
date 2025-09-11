@@ -1,0 +1,91 @@
+Create a web application hosted on GitHub that manages drill plans with the following requirements:
+
+Users can upload drill plans, and each scheduled drill plan must include:
+
+A date (required).
+
+Flight assignment: Alpha Flight, Tango Flight, or Both Flights.
+
+Association with a drill command selected from a dropdown list (with the ability to create new commands).
+
+Type of event: Drill movement or Class.
+
+Option to upload one or more files.
+
+Notes (optional, and can be added at creation or later).
+
+Drill plans are displayed on a calendar view:
+
+Multiple drill plans can exist on the same date.
+
+Each calendar block clearly shows which flight it applies to and whether it is a class or drill movement.
+
+Past and upcoming events are visually differentiated.
+
+Clicking a calendar block displays all details for that drill plan, including:
+
+Scheduled date and flight.
+
+Drill command name and type.
+
+Full notes history, with the ability to add new notes.
+
+Uploaded files, with options to preview or download them.
+
+Ability to edit any of the fields.
+
+Ability to duplicate the plan to another date.
+
+Navigation to previous or next iterations of that command.
+
+Drill command dropdown requirements:
+
+Lists all created commands.
+
+When a command is selected, the system duplicates it onto the new scheduled date, carrying over its metadata and notes history.
+
+The dropdown list itself never contains duplicates.
+
+For each command, the user can view when it was last executed by Alpha Flight and when it was last executed by Tango Flight.
+
+Ability to view the most recent occurrence of any command:
+
+Shows the date, associated notes, and uploaded files.
+
+Option to download or duplicate the command to a new date.
+
+Option to step back through earlier iterations of that command.
+
+Drill commands can also be created separately, with:
+
+A name.
+
+Type (Drill or Class).
+
+Optional uploaded files.
+
+Associated metadata.
+
+Once created, they appear in the dropdown list.
+
+Export feature:
+
+Export to an Excel file with a separate worksheet for each flight.
+
+Drill plans marked as “Both Flights” appear in both worksheets.
+
+Worksheets must clearly separate past and upcoming plans by date.
+
+Each row includes the date, command name, type, notes summary, file names, and links to files.
+
+Database management constraint:
+
+The database may not exceed 1 GB.
+
+When the limit is approached, the system must automatically prune data by deleting the oldest scheduled iterations until space is recovered.
+
+The newest iteration for each command must always be preserved.
+
+The system should only delete the minimum amount required and leave a small buffer under the 1 GB limit.
+
+All code, files, and hosting must be managed entirely in a GitHub repository.
