@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Calendar, ChevronLeft, ChevronRight, Copy, Download, Edit, Eye, FileText, Trash2 } from "lucide-react";
@@ -33,6 +33,18 @@ export default function DrillDetailModal({ drillPlanId, open, onOpenChange }: Dr
   }>({
     queryKey: ['/api/drill-plans', drillPlanId],
     enabled: !!drillPlanId && open,
+  });
+
+  // Fetch command files automatically when drill plan is loaded
+  const { data: commandFiles = [] } = useQuery<DrillPlanFile[]>({
+    queryKey: ['/api/commands', drillPlan?.command.id, 'files'],
+    queryFn: async () => {
+      if (!drillPlan?.command.id) return [];
+      const response = await fetch(`/api/commands/${drillPlan.command.id}`);
+      const commandData = await response.json();
+      return commandData.files || [];
+    },
+    enabled: !!drillPlan?.command.id && open,
   });
 
   const addNoteMutation = useMutation({
@@ -89,6 +101,11 @@ export default function DrillDetailModal({ drillPlanId, open, onOpenChange }: Dr
       a.download = fileName;
       a.click();
       window.URL.revokeObjectURL(url);
+      
+      toast({ 
+        title: "Success", 
+        description: `Downloaded ${fileName}` 
+      });
     } catch (error) {
       toast({ 
         title: "Error", 
@@ -102,6 +119,10 @@ export default function DrillDetailModal({ drillPlanId, open, onOpenChange }: Dr
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Loading Drill Plan</DialogTitle>
+            <DialogDescription>Please wait while we load the drill plan details</DialogDescription>
+          </DialogHeader>
           <div className="flex items-center justify-center h-32" data-testid="loading-drill-detail">
             <div className="text-muted-foreground">Loading drill plan details...</div>
           </div>
@@ -132,6 +153,9 @@ export default function DrillDetailModal({ drillPlanId, open, onOpenChange }: Dr
               <DialogTitle className="text-xl" data-testid="text-drill-plan-title">
                 {drillPlan.command.name}
               </DialogTitle>
+              <DialogDescription>
+                Drill plan details for {format(new Date(drillPlan.date), 'MMMM d, yyyy')}
+              </DialogDescription>
               <div className="flex items-center space-x-2 mt-1">
                 <span className="text-sm text-muted-foreground">
                   {format(new Date(drillPlan.date), 'MMMM d, yyyy')}
@@ -190,6 +214,51 @@ export default function DrillDetailModal({ drillPlanId, open, onOpenChange }: Dr
               )}
             </div>
           </div>
+
+          {/* Associated Documents from Command */}
+          {commandFiles.length > 0 && (
+            <div>
+              <h4 className="font-medium text-foreground mb-3">Associated Documents</h4>
+              <div className="space-y-2">
+                {commandFiles.map((file) => (
+                  <div 
+                    key={file.id} 
+                    className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                    data-testid={`command-file-item-${file.id}`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <FileText className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <div className="text-sm font-medium text-foreground">{file.fileName}</div>
+                        <div className="text-xs text-muted-foreground">
+                          Command Document • {(file.fileSize / 1024).toFixed(1)} KB
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        data-testid={`button-preview-command-file-${file.id}`}
+                      >
+                        <Eye className="h-4 w-4" />
+                        Preview
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleFileDownload(file.id, file.fileName)}
+                        data-testid={`button-download-command-file-${file.id}`}
+                      >
+                        <Download className="h-4 w-4" />
+                        Download
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Duplicate Section */}
           <div className="bg-muted rounded-lg p-4">

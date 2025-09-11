@@ -273,7 +273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // File operations
   app.get("/api/files/:id/download", async (req, res) => {
     try {
-      const [file] = await storage.getDrillPlanFiles(req.params.id);
+      const file = await storage.getFileById(req.params.id);
       if (!file) {
         return res.status(404).json({ message: "File not found" });
       }

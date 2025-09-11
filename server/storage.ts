@@ -45,6 +45,7 @@ export interface IStorage {
   createDrillPlanFile(file: InsertDrillPlanFile): Promise<DrillPlanFile>;
   getDrillPlanFiles(drillPlanId: string): Promise<DrillPlanFile[]>;
   getCommandFiles(commandId: string): Promise<DrillPlanFile[]>;
+  getFileById(id: string): Promise<DrillPlanFile | undefined>;
   deleteDrillPlanFile(id: string): Promise<boolean>;
 
   // Note methods
@@ -230,6 +231,11 @@ export class DatabaseStorage implements IStorage {
 
   async getCommandFiles(commandId: string): Promise<DrillPlanFile[]> {
     return await db.select().from(drillPlanFiles).where(eq(drillPlanFiles.commandId, commandId));
+  }
+
+  async getFileById(id: string): Promise<DrillPlanFile | undefined> {
+    const [file] = await db.select().from(drillPlanFiles).where(eq(drillPlanFiles.id, id));
+    return file || undefined;
   }
 
   async deleteDrillPlanFile(id: string): Promise<boolean> {
