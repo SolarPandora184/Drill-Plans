@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
@@ -10,6 +10,11 @@ import multer from "multer";
 import path from "path";
 import fs from "fs/promises";
 import { z } from "zod";
+
+// Extend Express Request type to include files
+interface MulterRequest extends Request {
+  files?: Express.Multer.File[] | { [fieldname: string]: Express.Multer.File[] };
+}
 
 // Configure multer for file uploads
 const uploadDir = path.join(process.cwd(), 'uploads');
@@ -66,7 +71,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/commands", upload.array('files'), async (req, res) => {
+  app.post("/api/commands", upload.array('files'), async (req: MulterRequest, res) => {
     try {
       const commandData = insertDrillCommandSchema.parse(req.body);
       const command = await storage.createDrillCommand(commandData);
@@ -149,7 +154,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/drill-plans", upload.array('files'), async (req, res) => {
+  app.post("/api/drill-plans", upload.array('files'), async (req: MulterRequest, res) => {
     try {
       const planData = insertDrillPlanSchema.parse({
         ...req.body,

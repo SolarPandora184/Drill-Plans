@@ -28,9 +28,10 @@ export default function Dashboard() {
       
       // Create CSV content for download
       const csvContent = Object.entries(data)
-        .map(([sheet, plans]: [string, any[]]) => {
-          const headers = Object.keys(plans[0] || {});
-          const rows = plans.map(plan => headers.map(h => plan[h]).join(','));
+        .map(([sheet, plans]) => {
+          const planArray = plans as any[];
+          const headers = Object.keys(planArray[0] || {});
+          const rows = planArray.map(plan => headers.map(h => plan[h]).join(','));
           return `${sheet}\n${headers.join(',')}\n${rows.join('\n')}`;
         })
         .join('\n\n');

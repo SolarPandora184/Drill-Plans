@@ -13,6 +13,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { DrillCommand } from "@shared/schema";
+
+interface CommandWithHistory extends DrillCommand {
+  lastAlphaExecution?: string | null;
+  lastTangoExecution?: string | null;
+}
 import { z } from "zod";
 
 const formSchema = insertDrillPlanSchema.extend({
@@ -25,7 +30,7 @@ type FormData = z.infer<typeof formSchema>;
 interface DrillPlanModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  commands: DrillCommand[];
+  commands: CommandWithHistory[];
 }
 
 export default function DrillPlanModal({ open, onOpenChange, commands }: DrillPlanModalProps) {

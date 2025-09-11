@@ -100,7 +100,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDrillCommand(id: string): Promise<boolean> {
     const result = await db.delete(drillCommands).where(eq(drillCommands.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Drill plan methods
@@ -180,7 +180,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDrillPlan(id: string): Promise<boolean> {
     const result = await db.delete(drillPlans).where(eq(drillPlans.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   async duplicateDrillPlan(id: string, newDate: Date): Promise<DrillPlan | undefined> {
@@ -234,7 +234,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDrillPlanFile(id: string): Promise<boolean> {
     const result = await db.delete(drillPlanFiles).where(eq(drillPlanFiles.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Note methods
@@ -251,7 +251,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDrillPlanNote(id: string): Promise<boolean> {
     const result = await db.delete(drillPlanNotes).where(eq(drillPlanNotes.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Command execution history
@@ -274,10 +274,10 @@ export class DatabaseStorage implements IStorage {
 
   // Database management
   async getDatabaseSize(): Promise<number> {
-    const [result] = await db.execute(sql`
+    const result = await db.execute(sql`
       SELECT pg_database_size(current_database()) as size
     `);
-    return result.size as number;
+    return (result.rows[0] as any).size as number;
   }
 
   async pruneOldData(): Promise<void> {
@@ -289,7 +289,7 @@ export class DatabaseStorage implements IStorage {
     if (currentSize <= targetSize) return;
 
     // Get oldest drill plans, but preserve newest iteration of each command
-    const oldestPlans = await db.execute(sql`
+    const oldestPlansResult = await db.execute(sql`
       WITH ranked_plans AS (
         SELECT 
           dp.id,
@@ -307,8 +307,8 @@ export class DatabaseStorage implements IStorage {
     `);
 
     // Delete old plans one by one until we're under the limit
-    for (const plan of oldestPlans) {
-      await this.deleteDrillPlan(plan.id);
+    for (const plan of oldestPlansResult.rows) {
+      await this.deleteDrillPlan((plan as any).id);
       
       const newSize = await this.getDatabaseSize();
       if (newSize <= targetSize) break;
