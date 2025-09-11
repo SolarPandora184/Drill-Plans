@@ -8,6 +8,11 @@ import DrillDetailModal from "@/components/drill-detail-modal";
 import { useQuery } from "@tanstack/react-query";
 import type { DrillPlan, DrillCommand } from "@shared/schema";
 
+interface CommandWithHistory extends DrillCommand {
+  lastAlphaExecution?: string | null;
+  lastTangoExecution?: string | null;
+}
+
 export default function Dashboard() {
   const [showDrillPlanModal, setShowDrillPlanModal] = useState(false);
   const [showCommandModal, setShowCommandModal] = useState(false);
@@ -17,7 +22,7 @@ export default function Dashboard() {
     queryKey: ["/api/drill-plans"],
   });
 
-  const { data: commands = [] } = useQuery<DrillCommand[]>({
+  const { data: commands = [] } = useQuery<CommandWithHistory[]>({
     queryKey: ["/api/commands"],
   });
 
