@@ -48,7 +48,7 @@ export const drillPlanFiles = pgTable("drill_plan_files", {
 
 export const drillPlanNotes = pgTable("drill_plan_notes", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  drillPlanId: uuid("drill_plan_id").notNull().references(() => drillPlans.id, { onDelete: 'cascade' }),
+  commandId: uuid("command_id").notNull().references(() => drillCommands.id, { onDelete: 'cascade' }),
   content: text("content").notNull(),
   authorName: text("author_name").notNull(),
   createdAt: timestamp("created_at").notNull().default(sql`now()`),
@@ -66,6 +66,7 @@ export const commandExecutionHistory = pgTable("command_execution_history", {
 export const drillCommandsRelations = relations(drillCommands, ({ many }) => ({
   drillPlans: many(drillPlans),
   files: many(drillPlanFiles),
+  notes: many(drillPlanNotes),
   executionHistory: many(commandExecutionHistory),
 }));
 
@@ -75,7 +76,6 @@ export const drillPlansRelations = relations(drillPlans, ({ one, many }) => ({
     references: [drillCommands.id],
   }),
   files: many(drillPlanFiles),
-  notes: many(drillPlanNotes),
   executionHistory: many(commandExecutionHistory),
 }));
 
@@ -91,9 +91,9 @@ export const drillPlanFilesRelations = relations(drillPlanFiles, ({ one }) => ({
 }));
 
 export const drillPlanNotesRelations = relations(drillPlanNotes, ({ one }) => ({
-  drillPlan: one(drillPlans, {
-    fields: [drillPlanNotes.drillPlanId],
-    references: [drillPlans.id],
+  command: one(drillCommands, {
+    fields: [drillPlanNotes.commandId],
+    references: [drillCommands.id],
   }),
 }));
 

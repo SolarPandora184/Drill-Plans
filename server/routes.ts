@@ -243,12 +243,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Notes
   app.post("/api/drill-plans/:id/notes", async (req, res) => {
     try {
+      // Get the drill plan to find the command ID
+      const drillPlan = await storage.getDrillPlan(req.params.id);
+      if (!drillPlan) {
+        return res.status(404).json({ message: "Drill plan not found" });
+      }
+
       const noteData = insertDrillPlanNoteSchema.parse({
         ...req.body,
-        drillPlanId: req.params.id,
+        commandId: drillPlan.commandId,
       });
       
-      const note = await storage.createDrillPlanNote(noteData);
+      const note = await storage.createCommandNote(noteData);
       res.json(note);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -260,7 +266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/notes/:id", async (req, res) => {
     try {
-      const success = await storage.deleteDrillPlanNote(req.params.id);
+      const success = await storage.deleteCommandNote(req.params.id);
       if (!success) {
         return res.status(404).json({ message: "Note not found" });
       }

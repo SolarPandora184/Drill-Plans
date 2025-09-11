@@ -49,9 +49,9 @@ export interface IStorage {
   deleteDrillPlanFile(id: string): Promise<boolean>;
 
   // Note methods
-  createDrillPlanNote(note: InsertDrillPlanNote): Promise<DrillPlanNote>;
-  getDrillPlanNotes(drillPlanId: string): Promise<DrillPlanNote[]>;
-  deleteDrillPlanNote(id: string): Promise<boolean>;
+  createCommandNote(note: InsertDrillPlanNote): Promise<DrillPlanNote>;
+  getCommandNotes(commandId: string): Promise<DrillPlanNote[]>;
+  deleteCommandNote(id: string): Promise<boolean>;
 
   // Command execution history
   getCommandExecutionHistory(commandId: string): Promise<CommandExecutionHistory[]>;
@@ -139,7 +139,7 @@ export class DatabaseStorage implements IStorage {
     if (!plan) return undefined;
 
     const files = await this.getDrillPlanFiles(id);
-    const notes = await this.getDrillPlanNotes(id);
+    const notes = await this.getCommandNotes(plan.commandId);
 
     return { ...plan, files, notes };
   }
@@ -207,14 +207,7 @@ export class DatabaseStorage implements IStorage {
       });
     }
 
-    // Copy notes
-    for (const note of originalPlan.notes) {
-      await this.createDrillPlanNote({
-        drillPlanId: newPlan.id,
-        content: note.content,
-        authorName: note.authorName,
-      });
-    }
+    // Notes are now shared at command level, no need to copy
 
     return newPlan;
   }
@@ -244,18 +237,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Note methods
-  async createDrillPlanNote(note: InsertDrillPlanNote): Promise<DrillPlanNote> {
+  async createCommandNote(note: InsertDrillPlanNote): Promise<DrillPlanNote> {
     const [newNote] = await db.insert(drillPlanNotes).values(note).returning();
     return newNote;
   }
 
-  async getDrillPlanNotes(drillPlanId: string): Promise<DrillPlanNote[]> {
+  async getCommandNotes(commandId: string): Promise<DrillPlanNote[]> {
     return await db.select().from(drillPlanNotes)
-      .where(eq(drillPlanNotes.drillPlanId, drillPlanId))
+      .where(eq(drillPlanNotes.commandId, commandId))
       .orderBy(drillPlanNotes.createdAt);
   }
 
-  async deleteDrillPlanNote(id: string): Promise<boolean> {
+  async deleteCommandNote(id: string): Promise<boolean> {
     const result = await db.delete(drillPlanNotes).where(eq(drillPlanNotes.id, id));
     return (result.rowCount ?? 0) > 0;
   }
