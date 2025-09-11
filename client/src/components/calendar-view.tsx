@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isBefore } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isBefore, getDay, addDays } from "date-fns";
 import type { DrillPlan, DrillCommand } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
@@ -16,7 +16,6 @@ export default function CalendarView({ drillPlans, onPlanClick }: CalendarViewPr
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
-  const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
   const goToPreviousMonth = () => {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
@@ -24,6 +23,20 @@ export default function CalendarView({ drillPlans, onPlanClick }: CalendarViewPr
 
   const goToNextMonth = () => {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+  };
+
+  const getTuesdaysInMonth = (monthStart: Date, monthEnd: Date) => {
+    const tuesdays: Date[] = [];
+    const allDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
+    
+    // Find all Tuesdays (getDay() returns 2 for Tuesday)
+    allDays.forEach(day => {
+      if (getDay(day) === 2) {
+        tuesdays.push(day);
+      }
+    });
+    
+    return tuesdays;
   };
 
   const getPlansForDay = (day: Date) => {
@@ -91,50 +104,85 @@ export default function CalendarView({ drillPlans, onPlanClick }: CalendarViewPr
           </div>
         </div>
 
-        {/* Calendar Grid */}
-        <div className="calendar-grid rounded-lg overflow-hidden">
-          {/* Header Days */}
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-            <div key={day} className="bg-muted p-3 text-center text-sm font-medium text-muted-foreground">
-              {day}
-            </div>
-          ))}
-
-          {/* Calendar Days */}
-          {days.map((day) => {
-            const dayPlans = getPlansForDay(day);
+        {/* Tuesday Calendar */}
+        <div className="space-y-4">
+          {getTuesdaysInMonth(monthStart, monthEnd).map((tuesday, index) => {
+            const dayPlans = getPlansForDay(tuesday);
+            const ordinalNumbers = ['1st', '2nd', '3rd', '4th', '5th'];
             
             return (
-              <div
-                key={day.toISOString()}
-                className="calendar-day p-2"
-                data-testid={`calendar-day-${format(day, 'yyyy-MM-dd')}`}
-              >
-                <div className="text-sm text-muted-foreground mb-1">
-                  {format(day, 'd')}
-                </div>
-                
-                {dayPlans.map((plan) => (
-                  <div
-                    key={plan.id}
-                    className={cn(
-                      "drill-event cursor-pointer text-xs p-1 mb-1 rounded",
-                      getFlightClass(plan.flightAssignment),
-                      isPastEvent(new Date(plan.date)) ? "past-event" : "upcoming-event"
-                    )}
-                    onClick={() => onPlanClick(plan.id)}
-                    data-testid={`drill-event-${plan.id}`}
-                  >
-                    <div className="font-medium">{plan.command.name}</div>
-                    <div className="text-xs">
-                      {plan.flightAssignment === 'alpha' ? 'Alpha' : 
-                       plan.flightAssignment === 'tango' ? 'Tango' : 'Both'} • {plan.eventType}
+              <Card key={tuesday.toISOString()} className="bg-muted/30 border border-border">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h3 className="text-lg font-semibold text-foreground">
+                        {ordinalNumbers[index]} Tuesday
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {format(tuesday, 'MMMM d, yyyy')}
+                      </p>
+                    </div>
+                    <div className={cn(
+                      "px-3 py-1 rounded-full text-xs font-medium",
+                      isPastEvent(tuesday) 
+                        ? "bg-gray-200 text-gray-600" 
+                        : "bg-blue-100 text-blue-700"
+                    )}>
+                      {isPastEvent(tuesday) ? 'Past' : 'Upcoming'}
                     </div>
                   </div>
-                ))}
-              </div>
+                  
+                  {dayPlans.length > 0 ? (
+                    <div className="space-y-2">
+                      {dayPlans.map((plan) => (
+                        <div
+                          key={plan.id}
+                          className={cn(
+                            "drill-event cursor-pointer p-3 rounded-lg border transition-colors hover:bg-background",
+                            getFlightClass(plan.flightAssignment),
+                            isPastEvent(new Date(plan.date)) ? "past-event" : "upcoming-event"
+                          )}
+                          onClick={() => onPlanClick(plan.id)}
+                          data-testid={`drill-event-${plan.id}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="font-medium text-foreground">{plan.command.name}</div>
+                              <div className="text-sm text-muted-foreground">
+                                {plan.flightAssignment === 'alpha' ? 'Alpha Flight' : 
+                                 plan.flightAssignment === 'tango' ? 'Tango Flight' : 'Both Flights'} • {plan.eventType === 'drill' ? 'Drill Movement' : 'Class'}
+                              </div>
+                            </div>
+                            <div className={cn(
+                              "px-2 py-1 rounded text-xs font-medium",
+                              plan.flightAssignment === 'alpha' 
+                                ? "bg-blue-100 text-blue-700" 
+                                : plan.flightAssignment === 'tango'
+                                ? "bg-amber-100 text-amber-700"
+                                : "bg-green-100 text-green-700"
+                            )}>
+                              {plan.flightAssignment === 'alpha' ? 'Alpha' : 
+                               plan.flightAssignment === 'tango' ? 'Tango' : 'Both'}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 text-muted-foreground">
+                      No drill plans scheduled for this Tuesday
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             );
           })}
+          
+          {getTuesdaysInMonth(monthStart, monthEnd).length === 0 && (
+            <div className="text-center py-12 text-muted-foreground">
+              No Tuesdays found in this month
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
