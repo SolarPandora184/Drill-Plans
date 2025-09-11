@@ -83,7 +83,10 @@ export default function Dashboard() {
                 New Command
               </Button>
               <Button 
-                onClick={() => setShowDrillPlanModal(true)}
+                onClick={() => {
+                  setSelectedDrillPlan(null);
+                  setShowDrillPlanModal(true);
+                }}
                 data-testid="button-new-drill-plan"
               >
                 <Plus className="mr-2 h-4 w-4" />

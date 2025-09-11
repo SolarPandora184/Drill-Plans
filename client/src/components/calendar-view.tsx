@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isBefore, getDay, addDays } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isBefore, getDay, startOfWeek, endOfWeek, addDays } from "date-fns";
 import type { DrillPlan, DrillCommand } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +16,10 @@ export default function CalendarView({ drillPlans, onPlanClick }: CalendarViewPr
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
+  const calendarStart = startOfWeek(monthStart);
+  const calendarEnd = endOfWeek(monthEnd);
+  
+  const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
   const goToPreviousMonth = () => {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
@@ -25,22 +29,12 @@ export default function CalendarView({ drillPlans, onPlanClick }: CalendarViewPr
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
   };
 
-  const getTuesdaysInMonth = (monthStart: Date, monthEnd: Date) => {
-    const tuesdays: Date[] = [];
-    const allDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
-    
-    // Find all Tuesdays (getDay() returns 2 for Tuesday)
-    allDays.forEach(day => {
-      if (getDay(day) === 2) {
-        tuesdays.push(day);
-      }
-    });
-    
-    return tuesdays;
-  };
-
   const getPlansForDay = (day: Date) => {
     return drillPlans.filter(plan => isSameDay(new Date(plan.date), day));
+  };
+
+  const isCurrentMonth = (day: Date) => {
+    return day.getMonth() === currentDate.getMonth();
   };
 
   const getFlightClass = (flightAssignment: string) => {
@@ -104,85 +98,74 @@ export default function CalendarView({ drillPlans, onPlanClick }: CalendarViewPr
           </div>
         </div>
 
-        {/* Tuesday Calendar */}
-        <div className="space-y-4">
-          {getTuesdaysInMonth(monthStart, monthEnd).map((tuesday, index) => {
-            const dayPlans = getPlansForDay(tuesday);
-            const ordinalNumbers = ['1st', '2nd', '3rd', '4th', '5th'];
+        {/* Horizontal Calendar Grid */}
+        <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
+          {/* Header Days */}
+          {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day) => (
+            <div key={day} className="bg-muted p-4 text-center font-medium text-foreground border-b border-border">
+              {day}
+            </div>
+          ))}
+
+          {/* Calendar Days */}
+          {days.map((day) => {
+            const dayPlans = getPlansForDay(day);
             
             return (
-              <Card key={tuesday.toISOString()} className="bg-muted/30 border border-border">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <h3 className="text-lg font-semibold text-foreground">
-                        {ordinalNumbers[index]} Tuesday
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        {format(tuesday, 'MMMM d, yyyy')}
-                      </p>
+              <div
+                key={day.toISOString()}
+                className={cn(
+                  "min-h-[120px] p-2 bg-background border-r border-b border-border",
+                  !isCurrentMonth(day) && "bg-muted/30 text-muted-foreground"
+                )}
+                data-testid={`calendar-day-${format(day, 'yyyy-MM-dd')}`}
+              >
+                <div className={cn(
+                  "text-sm font-medium mb-2",
+                  !isCurrentMonth(day) && "text-muted-foreground"
+                )}>
+                  {format(day, 'd')}
+                </div>
+                
+                <div className="space-y-1">
+                  {dayPlans.map((plan) => (
+                    <div
+                      key={plan.id}
+                      className={cn(
+                        "drill-event cursor-pointer text-xs p-2 rounded border transition-colors hover:shadow-sm",
+                        plan.flightAssignment === 'alpha' 
+                          ? "bg-blue-50 border-blue-200 text-blue-800 hover:bg-blue-100" 
+                          : plan.flightAssignment === 'tango'
+                          ? "bg-amber-50 border-amber-200 text-amber-800 hover:bg-amber-100"
+                          : "bg-green-50 border-green-200 text-green-800 hover:bg-green-100",
+                        isPastEvent(new Date(plan.date)) && "opacity-60"
+                      )}
+                      onClick={() => onPlanClick(plan.id)}
+                      data-testid={`drill-event-${plan.id}`}
+                    >
+                      <div className="font-medium truncate" title={plan.command.name}>
+                        {plan.command.name}
+                      </div>
+                      <div className="flex items-center justify-between mt-1">
+                        <span className="text-xs">
+                          {plan.flightAssignment === 'alpha' ? 'Alpha' : 
+                           plan.flightAssignment === 'tango' ? 'Tango' : 'Both'}
+                        </span>
+                        <span className={cn(
+                          "px-1 py-0.5 rounded text-xs",
+                          plan.eventType === 'drill' 
+                            ? "bg-white/50" 
+                            : "bg-white/70 font-medium"
+                        )}>
+                          {plan.eventType === 'drill' ? 'Drill' : 'Class'}
+                        </span>
+                      </div>
                     </div>
-                    <div className={cn(
-                      "px-3 py-1 rounded-full text-xs font-medium",
-                      isPastEvent(tuesday) 
-                        ? "bg-gray-200 text-gray-600" 
-                        : "bg-blue-100 text-blue-700"
-                    )}>
-                      {isPastEvent(tuesday) ? 'Past' : 'Upcoming'}
-                    </div>
-                  </div>
-                  
-                  {dayPlans.length > 0 ? (
-                    <div className="space-y-2">
-                      {dayPlans.map((plan) => (
-                        <div
-                          key={plan.id}
-                          className={cn(
-                            "drill-event cursor-pointer p-3 rounded-lg border transition-colors hover:bg-background",
-                            getFlightClass(plan.flightAssignment),
-                            isPastEvent(new Date(plan.date)) ? "past-event" : "upcoming-event"
-                          )}
-                          onClick={() => onPlanClick(plan.id)}
-                          data-testid={`drill-event-${plan.id}`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="font-medium text-foreground">{plan.command.name}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {plan.flightAssignment === 'alpha' ? 'Alpha Flight' : 
-                                 plan.flightAssignment === 'tango' ? 'Tango Flight' : 'Both Flights'} • {plan.eventType === 'drill' ? 'Drill Movement' : 'Class'}
-                              </div>
-                            </div>
-                            <div className={cn(
-                              "px-2 py-1 rounded text-xs font-medium",
-                              plan.flightAssignment === 'alpha' 
-                                ? "bg-blue-100 text-blue-700" 
-                                : plan.flightAssignment === 'tango'
-                                ? "bg-amber-100 text-amber-700"
-                                : "bg-green-100 text-green-700"
-                            )}>
-                              {plan.flightAssignment === 'alpha' ? 'Alpha' : 
-                               plan.flightAssignment === 'tango' ? 'Tango' : 'Both'}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-6 text-muted-foreground">
-                      No drill plans scheduled for this Tuesday
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                  ))}
+                </div>
+              </div>
             );
           })}
-          
-          {getTuesdaysInMonth(monthStart, monthEnd).length === 0 && (
-            <div className="text-center py-12 text-muted-foreground">
-              No Tuesdays found in this month
-            </div>
-          )}
         </div>
       </CardContent>
     </Card>

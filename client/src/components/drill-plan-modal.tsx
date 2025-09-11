@@ -5,14 +5,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Upload, X } from "lucide-react";
+import { Plus, Upload, X, Download, FileText } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertDrillPlanSchema } from "@shared/schema";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { DrillCommand } from "@shared/schema";
+import type { DrillCommand, DrillPlanFile } from "@shared/schema";
 
 interface CommandWithHistory extends DrillCommand {
   lastAlphaExecution?: string | null;
@@ -87,7 +87,14 @@ export default function DrillPlanModal({ open, onOpenChange, commands }: DrillPl
       queryClient.invalidateQueries({ queryKey: ['/api/drill-plans'] });
       toast({ title: "Success", description: "Drill plan created successfully" });
       onOpenChange(false);
-      form.reset();
+      form.reset({
+        date: new Date(),
+        flightAssignment: undefined,
+        commandId: '',
+        eventType: undefined,
+        notes: '',
+        authorName: '',
+      });
       setFiles([]);
     },
     onError: () => {
@@ -113,6 +120,42 @@ export default function DrillPlanModal({ open, onOpenChange, commands }: DrillPl
   };
 
   const selectedCommand = commands.find(c => c.id === form.watch('commandId'));
+  const selectedCommandId = form.watch('commandId');
+
+  // Fetch command files when a command is selected
+  const { data: commandFiles = [] } = useQuery<DrillPlanFile[]>({
+    queryKey: ['/api/commands', selectedCommandId, 'files'],
+    queryFn: async () => {
+      if (!selectedCommandId) return [];
+      const response = await fetch(`/api/commands/${selectedCommandId}`);
+      const commandData = await response.json();
+      return commandData.files || [];
+    },
+    enabled: !!selectedCommandId && open,
+  });
+
+  const handleFileDownload = async (fileId: string, fileName: string) => {
+    try {
+      const response = await fetch(`/api/files/${fileId}/download`);
+      if (!response.ok) throw new Error('Download failed');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      
+      toast({ title: "Success", description: `Downloaded ${fileName}` });
+    } catch (error) {
+      toast({ 
+        title: "Error", 
+        description: "Failed to download file",
+        variant: "destructive" 
+      });
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -192,11 +235,42 @@ export default function DrillPlanModal({ open, onOpenChange, commands }: DrillPl
                 </Button>
               </div>
               {selectedCommand && (
-                <div className="mt-2 text-xs text-muted-foreground">
-                  <div>Last Alpha: {selectedCommand.lastAlphaExecution ? 
-                    new Date(selectedCommand.lastAlphaExecution).toLocaleDateString() : 'Never'}</div>
-                  <div>Last Tango: {selectedCommand.lastTangoExecution ? 
-                    new Date(selectedCommand.lastTangoExecution).toLocaleDateString() : 'Never'}</div>
+                <div className="mt-2 space-y-2">
+                  <div className="text-xs text-muted-foreground">
+                    <div>Last Alpha: {selectedCommand.lastAlphaExecution ? 
+                      new Date(selectedCommand.lastAlphaExecution).toLocaleDateString() : 'Never'}</div>
+                    <div>Last Tango: {selectedCommand.lastTangoExecution ? 
+                      new Date(selectedCommand.lastTangoExecution).toLocaleDateString() : 'Never'}</div>
+                  </div>
+                  
+                  {commandFiles.length > 0 && (
+                    <div className="border rounded-lg p-3 bg-muted/30">
+                      <div className="text-sm font-medium text-foreground mb-2">Associated Documents:</div>
+                      <div className="space-y-2">
+                        {commandFiles.map((file) => (
+                          <div key={file.id} className="flex items-center justify-between p-2 bg-background rounded border">
+                            <div className="flex items-center space-x-2">
+                              <FileText className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm text-foreground">{file.fileName}</span>
+                              <span className="text-xs text-muted-foreground">
+                                ({(file.fileSize / 1024).toFixed(1)} KB)
+                              </span>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleFileDownload(file.id, file.fileName)}
+                              data-testid={`button-download-command-file-${file.id}`}
+                            >
+                              <Download className="h-4 w-4 mr-1" />
+                              Download
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               {form.formState.errors.commandId && (
