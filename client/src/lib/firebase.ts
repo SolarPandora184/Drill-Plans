@@ -10,14 +10,13 @@ import { getAuth } from "firebase/auth";
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyAHJTzaycRMyKRJ_zGHjdRGgstEl4W__VQ",
-  authDomain: "squadron-121-drill-plan-system.firebaseapp.com",
-  databaseURL: "https://squadron-121-drill-plan-system-default-rtdb.firebaseio.com",
-  projectId: "squadron-121-drill-plan-system",
-  storageBucket: "squadron-121-drill-plan-system.firebasestorage.app",
-  messagingSenderId: "802558272123",
-  appId: "1:802558272123:web:6b58b596bd9c669c80f8de",
-  measurementId: "G-FXFVGV5358"
+  apiKey: "AIzaSyD6LPigxx9Z7tLLppCuLyVFZL2ivPi9SPQ",
+  authDomain: "drill-plan-system.firebaseapp.com",
+  projectId: "drill-plan-system",
+  storageBucket: "drill-plan-system.firebasestorage.app",
+  messagingSenderId: "302757144421",
+  appId: "1:302757144421:web:10fdf2f69e1d5c24a6238c",
+  measurementId: "G-YZ1YTYWPNW"
 };
 
 // Initialize Firebase
