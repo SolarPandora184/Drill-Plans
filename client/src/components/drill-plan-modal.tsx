@@ -8,11 +8,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Plus, Upload, X, Download, FileText } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertDrillPlanSchema } from "@shared/schema";
+import { insertDrillPlanSchema } from "@shared/firebase-schema";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { DrillCommand, DrillPlanFile } from "@shared/schema";
+import type { DrillCommand, DrillPlanFile } from "@shared/firebase-schema";
 
 interface CommandWithHistory extends DrillCommand {
   lastAlphaExecution?: string | null;

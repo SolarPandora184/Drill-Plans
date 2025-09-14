@@ -8,10 +8,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Upload, X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertDrillCommandSchema } from "@shared/schema";
+import { insertDrillCommandSchema } from "@shared/firebase-schema";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import type { InsertDrillCommand } from "@shared/schema";
+import type { InsertDrillCommand } from "@shared/firebase-schema";
 
 interface CommandModalProps {
   open: boolean;

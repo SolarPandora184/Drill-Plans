@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isBefore, getDay, startOfWeek, endOfWeek, addDays } from "date-fns";
-import type { DrillPlan, DrillCommand } from "@shared/schema";
+import type { DrillPlan, DrillCommand } from "@shared/firebase-schema";
 import { cn } from "@/lib/utils";
 
 interface CalendarViewProps {

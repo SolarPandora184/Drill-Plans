@@ -11,7 +11,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import type { DrillPlan, DrillCommand, DrillPlanFile, DrillPlanNote } from "@shared/schema";
+import type { DrillPlan, DrillCommand, DrillPlanFile, DrillPlanNote } from "@shared/firebase-schema";
 
 interface DrillDetailModalProps {
   drillPlanId: string;

@@ -6,7 +6,7 @@ import DrillPlanModal from "@/components/drill-plan-modal";
 import CommandModal from "@/components/command-modal";
 import DrillDetailModal from "@/components/drill-detail-modal";
 import { useQuery } from "@tanstack/react-query";
-import type { DrillPlan, DrillCommand } from "@shared/schema";
+import type { DrillPlan, DrillCommand } from "@shared/firebase-schema";
 
 interface CommandWithHistory extends DrillCommand {
   lastAlphaExecution?: string | null;
