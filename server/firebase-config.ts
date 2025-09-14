@@ -1,12 +1,13 @@
 // Server-side Firebase configuration (no analytics on server)
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { getDatabase } from "firebase/database";
 import { getStorage } from "firebase/storage";
 
 // Firebase configuration (same as client but no analytics)
 const firebaseConfig = {
   apiKey: "AIzaSyD6LPigxx9Z7tLLppCuLyVFZL2ivPi9SPQ",
   authDomain: "drill-plan-system.firebaseapp.com",
+  databaseURL: "https://drill-plan-system-default-rtdb.firebaseio.com",
   projectId: "drill-plan-system",
   storageBucket: "drill-plan-system.firebasestorage.app",
   messagingSenderId: "302757144421",
@@ -18,7 +19,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig, 'server-app');
 
 // Initialize Firebase services (only server-compatible ones)
-const db = getFirestore(app);
+const db = getDatabase(app);
 const storage = getStorage(app);
 
 export { db, storage };

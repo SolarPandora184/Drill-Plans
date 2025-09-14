@@ -1,7 +1,7 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
-import { getFirestore } from "firebase/firestore";
+import { getDatabase } from "firebase/database";
 import { getStorage } from "firebase/storage";
 import { getAuth } from "firebase/auth";
 // TODO: Add SDKs for Firebase products that you want to use
@@ -12,6 +12,7 @@ import { getAuth } from "firebase/auth";
 const firebaseConfig = {
   apiKey: "AIzaSyD6LPigxx9Z7tLLppCuLyVFZL2ivPi9SPQ",
   authDomain: "drill-plan-system.firebaseapp.com",
+  databaseURL: "https://drill-plan-system-default-rtdb.firebaseio.com",
   projectId: "drill-plan-system",
   storageBucket: "drill-plan-system.firebasestorage.app",
   messagingSenderId: "302757144421",
@@ -24,7 +25,7 @@ const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 
 // Initialize Firebase services
-const db = getFirestore(app);
+const db = getDatabase(app);
 const storage = getStorage(app);
 const auth = getAuth(app);
 

@@ -1,20 +1,19 @@
 import { 
-  collection, 
-  doc, 
-  addDoc, 
-  getDoc, 
-  getDocs, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  orderBy, 
-  limit,
-  serverTimestamp,
-  Timestamp
-} from "firebase/firestore";
-import { 
   ref, 
+  set, 
+  get, 
+  push, 
+  update, 
+  remove,
+  query,
+  orderByChild,
+  orderByKey,
+  limitToLast,
+  equalTo,
+  child
+} from "firebase/database";
+import { 
+  ref as storageRef, 
   uploadBytes, 
   getDownloadURL, 
   deleteObject,
@@ -36,139 +35,95 @@ import type {
   InsertUser
 } from "@shared/firebase-schema";
 
-// Firebase types (adjusting for Firestore's string IDs and timestamp handling)
-type FirebaseDrillCommand = Omit<DrillCommand, 'id' | 'createdAt'> & {
-  id: string;
-  createdAt: Timestamp;
+// Helper function to generate unique IDs
+const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
+
+// Helper function to convert Firebase snapshot data
+const snapshotToArray = (snapshot: any): any[] => {
+  const data = snapshot.val();
+  if (!data) return [];
+  return Object.keys(data).map(key => ({
+    id: key,
+    ...data[key]
+  }));
 };
-
-type FirebaseDrillPlan = Omit<DrillPlan, 'id' | 'createdAt' | 'updatedAt'> & {
-  id: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-};
-
-type FirebaseDrillPlanFile = Omit<DrillPlanFile, 'id' | 'uploadedAt'> & {
-  id: string;
-  uploadedAt: Timestamp;
-  downloadUrl?: string; // Firebase Storage download URL
-};
-
-type FirebaseDrillPlanNote = Omit<DrillPlanNote, 'id' | 'createdAt'> & {
-  id: string;
-  createdAt: Timestamp;
-};
-
-type FirebaseCommandExecutionHistory = Omit<CommandExecutionHistory, 'id' | 'executedAt'> & {
-  id: string;
-  executedAt: Timestamp;
-};
-
-// Helper function to convert Firestore Timestamp to Date
-const timestampToDate = (timestamp: Timestamp): Date => timestamp.toDate();
-
-// Helper function to convert Firebase objects to expected types
-const convertFirebaseCommand = (doc: any): DrillCommand => ({
-  ...doc,
-  createdAt: timestampToDate(doc.createdAt)
-});
-
-const convertFirebasePlan = (doc: any): DrillPlan => ({
-  ...doc,
-  date: timestampToDate(doc.date),
-  createdAt: timestampToDate(doc.createdAt),
-  updatedAt: timestampToDate(doc.updatedAt)
-});
-
-const convertFirebaseFile = (doc: any): DrillPlanFile => ({
-  ...doc,
-  uploadedAt: timestampToDate(doc.uploadedAt)
-});
-
-const convertFirebaseNote = (doc: any): DrillPlanNote => ({
-  ...doc,
-  createdAt: timestampToDate(doc.createdAt)
-});
-
-const convertFirebaseHistory = (doc: any): CommandExecutionHistory => ({
-  ...doc,
-  executedAt: timestampToDate(doc.executedAt)
-});
 
 export class FirebaseStorage implements IStorage {
-  // Collections
-  private commandsCollection = collection(db, 'drillCommands');
-  private plansCollection = collection(db, 'drillPlans');
-  private filesCollection = collection(db, 'drillPlanFiles');
-  private notesCollection = collection(db, 'drillPlanNotes');
-  private historyCollection = collection(db, 'commandExecutionHistory');
-  private usersCollection = collection(db, 'users');
-
   // User methods (legacy)
   async getUser(id: string): Promise<User | undefined> {
-    const userDoc = doc(this.usersCollection, id);
-    const docSnap = await getDoc(userDoc);
-    return docSnap.exists() ? { id: docSnap.id, ...docSnap.data() } as User : undefined;
+    const userRef = ref(db, `users/${id}`);
+    const snapshot = await get(userRef);
+    return snapshot.exists() ? { id, ...snapshot.val() } as User : undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const q = query(this.usersCollection, where("username", "==", username), limit(1));
-    const querySnapshot = await getDocs(q);
+    const usersRef = ref(db, 'users');
+    const usersQuery = query(usersRef, orderByChild('username'), equalTo(username), limitToLast(1));
+    const snapshot = await get(usersQuery);
     
-    if (querySnapshot.empty) return undefined;
+    if (!snapshot.exists()) return undefined;
     
-    const doc = querySnapshot.docs[0];
-    return { id: doc.id, ...doc.data() } as User;
+    const data = snapshot.val();
+    const userId = Object.keys(data)[0];
+    return { id: userId, ...data[userId] } as User;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const docRef = await addDoc(this.usersCollection, insertUser);
-    return { id: docRef.id, ...insertUser } as User;
+    const id = generateId();
+    const userRef = ref(db, `users/${id}`);
+    await set(userRef, insertUser);
+    return { id, ...insertUser } as User;
   }
 
   // Drill command methods
   async getAllDrillCommands(): Promise<DrillCommand[]> {
-    const q = query(this.commandsCollection, orderBy("name"));
-    const querySnapshot = await getDocs(q);
+    const commandsRef = ref(db, 'drillCommands');
+    const snapshot = await get(commandsRef);
+    const commands = snapshotToArray(snapshot);
     
-    return querySnapshot.docs.map(doc => 
-      convertFirebaseCommand({ id: doc.id, ...doc.data() })
-    );
+    return commands.map(cmd => ({
+      ...cmd,
+      createdAt: new Date(cmd.createdAt)
+    })).sort((a, b) => a.name.localeCompare(b.name));
   }
 
   async getDrillCommand(id: string): Promise<DrillCommand | undefined> {
-    const commandDoc = doc(this.commandsCollection, id);
-    const docSnap = await getDoc(commandDoc);
+    const commandRef = ref(db, `drillCommands/${id}`);
+    const snapshot = await get(commandRef);
     
-    return docSnap.exists() 
-      ? convertFirebaseCommand({ id: docSnap.id, ...docSnap.data() })
+    return snapshot.exists() 
+      ? { id, ...snapshot.val(), createdAt: new Date(snapshot.val().createdAt) }
       : undefined;
   }
 
   async createDrillCommand(command: InsertDrillCommand): Promise<DrillCommand> {
-    const docRef = await addDoc(this.commandsCollection, {
+    const id = generateId();
+    const commandRef = ref(db, `drillCommands/${id}`);
+    const commandData = {
       ...command,
-      createdAt: serverTimestamp()
-    });
+      createdAt: new Date().toISOString()
+    };
     
-    return convertFirebaseCommand({
-      id: docRef.id,
+    await set(commandRef, commandData);
+    
+    return {
+      id,
       ...command,
-      createdAt: Timestamp.now()
-    });
+      metadata: command.metadata ?? null,
+      createdAt: new Date()
+    };
   }
 
   async updateDrillCommand(id: string, command: Partial<InsertDrillCommand>): Promise<DrillCommand | undefined> {
-    const commandDoc = doc(this.commandsCollection, id);
-    await updateDoc(commandDoc, command);
-    
-    const updated = await this.getDrillCommand(id);
-    return updated;
+    const commandRef = ref(db, `drillCommands/${id}`);
+    await update(commandRef, command);
+    return await this.getDrillCommand(id);
   }
 
   async deleteDrillCommand(id: string): Promise<boolean> {
     try {
-      await deleteDoc(doc(this.commandsCollection, id));
+      const commandRef = ref(db, `drillCommands/${id}`);
+      await remove(commandRef);
       return true;
     } catch {
       return false;
@@ -177,32 +132,40 @@ export class FirebaseStorage implements IStorage {
 
   // Drill plan methods
   async getAllDrillPlans(): Promise<(DrillPlan & { command: DrillCommand })[]> {
-    const q = query(this.plansCollection, orderBy("date"));
-    const querySnapshot = await getDocs(q);
+    const plansRef = ref(db, 'drillPlans');
+    const snapshot = await get(plansRef);
+    const plans = snapshotToArray(snapshot);
     
-    const plans = await Promise.all(
-      querySnapshot.docs.map(async planDoc => {
-        const planData = { id: planDoc.id, ...planDoc.data() } as any;
-        const command = await this.getDrillCommand(planData.commandId);
-        
+    const plansWithCommands = await Promise.all(
+      plans.map(async plan => {
+        const command = await this.getDrillCommand(plan.commandId);
         return {
-          ...convertFirebasePlan(planData),
+          ...plan,
+          date: new Date(plan.date),
+          createdAt: new Date(plan.createdAt),
+          updatedAt: new Date(plan.updatedAt),
           command: command!
         };
       })
     );
     
-    return plans;
+    return plansWithCommands.sort((a, b) => a.date.getTime() - b.date.getTime());
   }
 
   async getDrillPlan(id: string): Promise<(DrillPlan & { command: DrillCommand; files: DrillPlanFile[]; notes: DrillPlanNote[] }) | undefined> {
-    const planDoc = doc(this.plansCollection, id);
-    const docSnap = await getDoc(planDoc);
+    const planRef = ref(db, `drillPlans/${id}`);
+    const snapshot = await get(planRef);
     
-    if (!docSnap.exists()) return undefined;
+    if (!snapshot.exists()) return undefined;
     
-    const planData = { id: docSnap.id, ...docSnap.data() };
-    const plan = convertFirebasePlan(planData);
+    const planData = snapshot.val();
+    const plan = {
+      id,
+      ...planData,
+      date: new Date(planData.date),
+      createdAt: new Date(planData.createdAt),
+      updatedAt: new Date(planData.updatedAt)
+    };
     
     const [command, files, notes] = await Promise.all([
       this.getDrillCommand(plan.commandId),
@@ -219,59 +182,68 @@ export class FirebaseStorage implements IStorage {
   }
 
   async createDrillPlan(plan: InsertDrillPlan): Promise<DrillPlan> {
-    const now = serverTimestamp();
-    const docRef = await addDoc(this.plansCollection, {
+    const id = generateId();
+    const now = new Date().toISOString();
+    const planRef = ref(db, `drillPlans/${id}`);
+    const planData = {
       ...plan,
-      date: Timestamp.fromDate(plan.date),
+      date: plan.date.toISOString(),
       createdAt: now,
       updatedAt: now
-    });
+    };
+    
+    await set(planRef, planData);
     
     // Create execution history entry
-    await addDoc(this.historyCollection, {
+    const historyId = generateId();
+    const historyRef = ref(db, `commandExecutionHistory/${historyId}`);
+    await set(historyRef, {
       commandId: plan.commandId,
-      drillPlanId: docRef.id,
+      drillPlanId: id,
       flightType: plan.flightAssignment === 'both' ? 'alpha' : plan.flightAssignment,
-      executedAt: Timestamp.fromDate(plan.date)
+      executedAt: plan.date.toISOString()
     });
     
     // If both flights, create second entry for tango
     if (plan.flightAssignment === 'both') {
-      await addDoc(this.historyCollection, {
+      const historyId2 = generateId();
+      const historyRef2 = ref(db, `commandExecutionHistory/${historyId2}`);
+      await set(historyRef2, {
         commandId: plan.commandId,
-        drillPlanId: docRef.id,
+        drillPlanId: id,
         flightType: 'tango',
-        executedAt: Timestamp.fromDate(plan.date)
+        executedAt: plan.date.toISOString()
       });
     }
     
-    return convertFirebasePlan({
-      id: docRef.id,
+    return {
+      id,
       ...plan,
-      date: Timestamp.fromDate(plan.date),
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now()
-    });
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
   }
 
   async updateDrillPlan(id: string, plan: Partial<InsertDrillPlan>): Promise<DrillPlan | undefined> {
-    const planDoc = doc(this.plansCollection, id);
+    const planRef = ref(db, `drillPlans/${id}`);
     const updateData: any = { 
       ...plan,
-      updatedAt: serverTimestamp()
+      updatedAt: new Date().toISOString()
     };
     
     if (plan.date) {
-      updateData.date = Timestamp.fromDate(plan.date);
+      updateData.date = plan.date.toISOString();
     }
     
-    await updateDoc(planDoc, updateData);
-    return await this.getDrillPlan(id).then(result => result ? result : undefined);
+    await update(planRef, updateData);
+    const updated = await this.getDrillPlan(id);
+    return updated ? updated : undefined;
   }
 
   async deleteDrillPlan(id: string): Promise<boolean> {
     try {
-      await deleteDoc(doc(this.plansCollection, id));
+      const planRef = ref(db, `drillPlans/${id}`);
+      await remove(planRef);
       return true;
     } catch {
       return false;
@@ -306,42 +278,54 @@ export class FirebaseStorage implements IStorage {
 
   // File methods
   async createDrillPlanFile(file: InsertDrillPlanFile): Promise<DrillPlanFile> {
-    const docRef = await addDoc(this.filesCollection, {
+    const id = generateId();
+    const fileRef = ref(db, `drillPlanFiles/${id}`);
+    const fileData = {
       ...file,
-      uploadedAt: serverTimestamp()
-    });
+      uploadedAt: new Date().toISOString()
+    };
     
-    return convertFirebaseFile({
-      id: docRef.id,
+    await set(fileRef, fileData);
+    
+    return {
+      id,
       ...file,
-      uploadedAt: Timestamp.now()
-    });
+      drillPlanId: file.drillPlanId ?? null,
+      commandId: file.commandId ?? null,
+      uploadedAt: new Date()
+    };
   }
 
   async getDrillPlanFiles(drillPlanId: string): Promise<DrillPlanFile[]> {
-    const q = query(this.filesCollection, where("drillPlanId", "==", drillPlanId));
-    const querySnapshot = await getDocs(q);
+    const filesRef = ref(db, 'drillPlanFiles');
+    const filesQuery = query(filesRef, orderByChild('drillPlanId'), equalTo(drillPlanId));
+    const snapshot = await get(filesQuery);
     
-    return querySnapshot.docs.map(doc => 
-      convertFirebaseFile({ id: doc.id, ...doc.data() })
-    );
+    const files = snapshotToArray(snapshot);
+    return files.map(file => ({
+      ...file,
+      uploadedAt: new Date(file.uploadedAt)
+    }));
   }
 
   async getCommandFiles(commandId: string): Promise<DrillPlanFile[]> {
-    const q = query(this.filesCollection, where("commandId", "==", commandId));
-    const querySnapshot = await getDocs(q);
+    const filesRef = ref(db, 'drillPlanFiles');
+    const filesQuery = query(filesRef, orderByChild('commandId'), equalTo(commandId));
+    const snapshot = await get(filesQuery);
     
-    return querySnapshot.docs.map(doc => 
-      convertFirebaseFile({ id: doc.id, ...doc.data() })
-    );
+    const files = snapshotToArray(snapshot);
+    return files.map(file => ({
+      ...file,
+      uploadedAt: new Date(file.uploadedAt)
+    }));
   }
 
   async getFileById(id: string): Promise<DrillPlanFile | undefined> {
-    const fileDoc = doc(this.filesCollection, id);
-    const docSnap = await getDoc(fileDoc);
+    const fileRef = ref(db, `drillPlanFiles/${id}`);
+    const snapshot = await get(fileRef);
     
-    return docSnap.exists() 
-      ? convertFirebaseFile({ id: docSnap.id, ...docSnap.data() })
+    return snapshot.exists() 
+      ? { id, ...snapshot.val(), uploadedAt: new Date(snapshot.val().uploadedAt) }
       : undefined;
   }
 
@@ -350,11 +334,12 @@ export class FirebaseStorage implements IStorage {
       const file = await this.getFileById(id);
       if (file && file.filePath) {
         // Delete from Firebase Storage
-        const fileRef = ref(firebaseStorage, file.filePath);
+        const fileRef = storageRef(firebaseStorage, file.filePath);
         await deleteObject(fileRef);
       }
       
-      await deleteDoc(doc(this.filesCollection, id));
+      const dbFileRef = ref(db, `drillPlanFiles/${id}`);
+      await remove(dbFileRef);
       return true;
     } catch {
       return false;
@@ -363,34 +348,38 @@ export class FirebaseStorage implements IStorage {
 
   // Note methods
   async createCommandNote(note: InsertDrillPlanNote): Promise<DrillPlanNote> {
-    const docRef = await addDoc(this.notesCollection, {
+    const id = generateId();
+    const noteRef = ref(db, `drillPlanNotes/${id}`);
+    const noteData = {
       ...note,
-      createdAt: serverTimestamp()
-    });
+      createdAt: new Date().toISOString()
+    };
     
-    return convertFirebaseNote({
-      id: docRef.id,
+    await set(noteRef, noteData);
+    
+    return {
+      id,
       ...note,
-      createdAt: Timestamp.now()
-    });
+      createdAt: new Date()
+    };
   }
 
   async getCommandNotes(commandId: string): Promise<DrillPlanNote[]> {
-    const q = query(
-      this.notesCollection, 
-      where("commandId", "==", commandId),
-      orderBy("createdAt")
-    );
-    const querySnapshot = await getDocs(q);
+    const notesRef = ref(db, 'drillPlanNotes');
+    const notesQuery = query(notesRef, orderByChild('commandId'), equalTo(commandId));
+    const snapshot = await get(notesQuery);
     
-    return querySnapshot.docs.map(doc => 
-      convertFirebaseNote({ id: doc.id, ...doc.data() })
-    );
+    const notes = snapshotToArray(snapshot);
+    return notes.map(note => ({
+      ...note,
+      createdAt: new Date(note.createdAt)
+    })).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   }
 
   async deleteCommandNote(id: string): Promise<boolean> {
     try {
-      await deleteDoc(doc(this.notesCollection, id));
+      const noteRef = ref(db, `drillPlanNotes/${id}`);
+      await remove(noteRef);
       return true;
     } catch {
       return false;
@@ -399,57 +388,60 @@ export class FirebaseStorage implements IStorage {
 
   // Command execution history
   async getCommandExecutionHistory(commandId: string): Promise<CommandExecutionHistory[]> {
-    const q = query(
-      this.historyCollection,
-      where("commandId", "==", commandId),
-      orderBy("executedAt", "desc")
-    );
-    const querySnapshot = await getDocs(q);
+    const historyRef = ref(db, 'commandExecutionHistory');
+    const historyQuery = query(historyRef, orderByChild('commandId'), equalTo(commandId));
+    const snapshot = await get(historyQuery);
     
-    return querySnapshot.docs.map(doc => 
-      convertFirebaseHistory({ id: doc.id, ...doc.data() })
-    );
+    const history = snapshotToArray(snapshot);
+    return history.map(item => ({
+      ...item,
+      executedAt: new Date(item.executedAt)
+    })).sort((a, b) => b.executedAt.getTime() - a.executedAt.getTime());
   }
 
   async getLastExecutionByFlight(commandId: string, flight: 'alpha' | 'tango'): Promise<CommandExecutionHistory | undefined> {
-    const q = query(
-      this.historyCollection,
-      where("commandId", "==", commandId),
-      where("flightType", "==", flight),
-      orderBy("executedAt", "desc"),
-      limit(1)
-    );
-    const querySnapshot = await getDocs(q);
+    const historyRef = ref(db, 'commandExecutionHistory');
+    const snapshot = await get(historyRef);
+    const history = snapshotToArray(snapshot);
     
-    if (querySnapshot.empty) return undefined;
+    const filtered = history
+      .filter(item => item.commandId === commandId && item.flightType === flight)
+      .map(item => ({
+        ...item,
+        executedAt: new Date(item.executedAt)
+      }))
+      .sort((a, b) => b.executedAt.getTime() - a.executedAt.getTime());
     
-    const doc = querySnapshot.docs[0];
-    return convertFirebaseHistory({ id: doc.id, ...doc.data() });
+    return filtered.length > 0 ? filtered[0] : undefined;
   }
 
-  // Database management (adapted for Firestore)
+  // Database management (adapted for Realtime Database)
   async getDatabaseSize(): Promise<number> {
-    // Firestore doesn't have direct size queries, return estimated size
+    // For Realtime Database, we'll estimate size based on total records
     const collections = [
-      this.commandsCollection,
-      this.plansCollection,
-      this.filesCollection,
-      this.notesCollection,
-      this.historyCollection
+      'drillCommands',
+      'drillPlans', 
+      'drillPlanFiles',
+      'drillPlanNotes',
+      'commandExecutionHistory'
     ];
     
-    let totalDocs = 0;
+    let totalRecords = 0;
     for (const collection of collections) {
-      const snapshot = await getDocs(collection);
-      totalDocs += snapshot.size;
+      const collectionRef = ref(db, collection);
+      const snapshot = await get(collectionRef);
+      const data = snapshot.val();
+      if (data) {
+        totalRecords += Object.keys(data).length;
+      }
     }
     
-    // Estimate: 1KB average per document
-    return totalDocs * 1024;
+    // Estimate: 1KB average per record
+    return totalRecords * 1024;
   }
 
   async pruneOldData(): Promise<void> {
-    // For Firestore, we'll implement a simple pruning strategy
+    // For Realtime Database, implement simple pruning strategy
     // Keep only the latest drill plan for each command
     const plans = await this.getAllDrillPlans();
     const commandPlanMap = new Map<string, DrillPlan[]>();
