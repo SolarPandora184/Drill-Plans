@@ -20,7 +20,7 @@ import {
   deleteObject,
   getMetadata
 } from "firebase/storage";
-import { db, storage as firebaseStorage } from "../client/src/lib/firebase";
+import { db, storage as firebaseStorage } from "./firebase-config";
 import type { IStorage } from "./storage";
 import type {
   DrillCommand,
@@ -34,7 +34,7 @@ import type {
   CommandExecutionHistory,
   User,
   InsertUser
-} from "@shared/schema";
+} from "@shared/firebase-schema";
 
 // Firebase types (adjusting for Firestore's string IDs and timestamp handling)
 type FirebaseDrillCommand = Omit<DrillCommand, 'id' | 'createdAt'> & {

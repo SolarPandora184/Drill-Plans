@@ -1,11 +1,11 @@
 import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { storage } from "./firebase-db";
 import { 
   insertDrillCommandSchema, 
   insertDrillPlanSchema,
   insertDrillPlanNoteSchema
-} from "@shared/schema";
+} from "@shared/firebase-schema";
 import multer from "multer";
 import path from "path";
 import fs from "fs/promises";
@@ -84,7 +84,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           await storage.createDrillPlanFile({
             commandId: command.id,
-            drillPlanId: null,
+            drillPlanId: null as string | null,
             fileName: file.originalname,
             filePath: finalPath,
             fileSize: file.size,
