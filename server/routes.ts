@@ -10,21 +10,28 @@ import multer from "multer";
 import path from "path";
 import fs from "fs/promises";
 import { z } from "zod";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { storage as firebaseStorage } from "./firebase-config";
 
 // Extend Express Request type to include files
 interface MulterRequest extends Request {
   files?: Express.Multer.File[] | { [fieldname: string]: Express.Multer.File[] };
 }
 
-// Configure multer for file uploads
-const uploadDir = path.join(process.cwd(), 'uploads');
+// Configure multer for memory storage (Firebase Storage)
 const upload = multer({ 
-  dest: uploadDir,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 100 * 1024 * 1024 } // 100MB limit
 });
 
-// Ensure upload directory exists
-fs.mkdir(uploadDir, { recursive: true }).catch(console.error);
+// Helper function to upload file to Firebase Storage
+async function uploadToFirebaseStorage(file: Express.Multer.File, path: string): Promise<string> {
+  const storageRef = ref(firebaseStorage, path);
+  const snapshot = await uploadBytes(storageRef, file.buffer, {
+    contentType: file.mimetype
+  });
+  return await getDownloadURL(snapshot.ref);
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   
@@ -76,17 +83,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const commandData = insertDrillCommandSchema.parse(req.body);
       const command = await storage.createDrillCommand(commandData);
       
-      // Handle file uploads
+      // Handle file uploads to Firebase Storage
       if (req.files && Array.isArray(req.files)) {
         for (const file of req.files) {
-          const finalPath = path.join(uploadDir, `${command.id}_${file.originalname}`);
-          await fs.rename(file.path, finalPath);
+          const firebasePath = `commands/${command.id}/${file.originalname}`;
+          const downloadUrl = await uploadToFirebaseStorage(file, firebasePath);
           
           await storage.createDrillPlanFile({
             commandId: command.id,
             drillPlanId: null as string | null,
             fileName: file.originalname,
-            filePath: finalPath,
+            filePath: firebasePath, // Firebase Storage path
             fileSize: file.size,
             mimeType: file.mimetype,
           });
@@ -163,17 +170,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const plan = await storage.createDrillPlan(planData);
       
-      // Handle file uploads
+      // Handle file uploads to Firebase Storage
       if (req.files && Array.isArray(req.files)) {
         for (const file of req.files) {
-          const finalPath = path.join(uploadDir, `${plan.id}_${file.originalname}`);
-          await fs.rename(file.path, finalPath);
+          const firebasePath = `drill-plans/${plan.id}/${file.originalname}`;
+          const downloadUrl = await uploadToFirebaseStorage(file, firebasePath);
           
           await storage.createDrillPlanFile({
             drillPlanId: plan.id,
             commandId: planData.commandId,
             fileName: file.originalname,
-            filePath: finalPath,
+            filePath: firebasePath, // Firebase Storage path
             fileSize: file.size,
             mimeType: file.mimetype,
           });
@@ -284,7 +291,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "File not found" });
       }
       
-      res.download(file.filePath, file.fileName);
+      // For Firebase Storage, redirect to the download URL
+      const downloadUrl = await getDownloadURL(ref(firebaseStorage, file.filePath));
+      res.redirect(downloadUrl);
     } catch (error) {
       res.status(500).json({ message: "Failed to download file" });
     }
