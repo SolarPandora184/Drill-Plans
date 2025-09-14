@@ -88,12 +88,23 @@ export class FirebaseStorage implements IStorage {
   }
 
   async getDrillCommand(id: string): Promise<DrillCommand | undefined> {
-    const commandRef = ref(db, `drillCommands/${id}`);
-    const snapshot = await get(commandRef);
-    
-    return snapshot.exists() 
-      ? { id, ...snapshot.val(), createdAt: new Date(snapshot.val().createdAt) }
-      : undefined;
+    try {
+      const commandRef = ref(db, `drillCommands/${id}`);
+      const snapshot = await get(commandRef);
+      
+      if (!snapshot.exists()) return undefined;
+      
+      const data = snapshot.val();
+      return {
+        id,
+        ...data,
+        metadata: data.metadata ?? null,
+        createdAt: data.createdAt ? new Date(data.createdAt) : new Date()
+      };
+    } catch (error) {
+      console.error('Error getting drill command:', error);
+      return undefined;
+    }
   }
 
   async createDrillCommand(command: InsertDrillCommand): Promise<DrillCommand> {
@@ -153,32 +164,42 @@ export class FirebaseStorage implements IStorage {
   }
 
   async getDrillPlan(id: string): Promise<(DrillPlan & { command: DrillCommand; files: DrillPlanFile[]; notes: DrillPlanNote[] }) | undefined> {
-    const planRef = ref(db, `drillPlans/${id}`);
-    const snapshot = await get(planRef);
-    
-    if (!snapshot.exists()) return undefined;
-    
-    const planData = snapshot.val();
-    const plan = {
-      id,
-      ...planData,
-      date: new Date(planData.date),
-      createdAt: new Date(planData.createdAt),
-      updatedAt: new Date(planData.updatedAt)
-    };
-    
-    const [command, files, notes] = await Promise.all([
-      this.getDrillCommand(plan.commandId),
-      this.getDrillPlanFiles(id),
-      this.getCommandNotes(plan.commandId)
-    ]);
-    
-    return {
-      ...plan,
-      command: command!,
-      files,
-      notes
-    };
+    try {
+      const planRef = ref(db, `drillPlans/${id}`);
+      const snapshot = await get(planRef);
+      
+      if (!snapshot.exists()) return undefined;
+      
+      const planData = snapshot.val();
+      const plan = {
+        id,
+        ...planData,
+        date: planData.date ? new Date(planData.date) : new Date(),
+        createdAt: planData.createdAt ? new Date(planData.createdAt) : new Date(),
+        updatedAt: planData.updatedAt ? new Date(planData.updatedAt) : new Date()
+      };
+      
+      const [command, files, notes] = await Promise.all([
+        this.getDrillCommand(plan.commandId),
+        this.getDrillPlanFiles(id),
+        this.getCommandNotes(plan.commandId)
+      ]);
+      
+      if (!command) {
+        console.error(`Command ${plan.commandId} not found for drill plan ${id}`);
+        return undefined;
+      }
+      
+      return {
+        ...plan,
+        command,
+        files,
+        notes
+      };
+    } catch (error) {
+      console.error('Error getting drill plan:', error);
+      return undefined;
+    }
   }
 
   async createDrillPlan(plan: InsertDrillPlan): Promise<DrillPlan> {
@@ -297,27 +318,39 @@ export class FirebaseStorage implements IStorage {
   }
 
   async getDrillPlanFiles(drillPlanId: string): Promise<DrillPlanFile[]> {
-    const filesRef = ref(db, 'drillPlanFiles');
-    const filesQuery = query(filesRef, orderByChild('drillPlanId'), equalTo(drillPlanId));
-    const snapshot = await get(filesQuery);
-    
-    const files = snapshotToArray(snapshot);
-    return files.map(file => ({
-      ...file,
-      uploadedAt: new Date(file.uploadedAt)
-    }));
+    try {
+      const filesRef = ref(db, 'drillPlanFiles');
+      const snapshot = await get(filesRef);
+      
+      const files = snapshotToArray(snapshot)
+        .filter(file => file.drillPlanId === drillPlanId);
+        
+      return files.map(file => ({
+        ...file,
+        uploadedAt: new Date(file.uploadedAt)
+      }));
+    } catch (error) {
+      console.error('Error getting drill plan files:', error);
+      return [];
+    }
   }
 
   async getCommandFiles(commandId: string): Promise<DrillPlanFile[]> {
-    const filesRef = ref(db, 'drillPlanFiles');
-    const filesQuery = query(filesRef, orderByChild('commandId'), equalTo(commandId));
-    const snapshot = await get(filesQuery);
-    
-    const files = snapshotToArray(snapshot);
-    return files.map(file => ({
-      ...file,
-      uploadedAt: new Date(file.uploadedAt)
-    }));
+    try {
+      const filesRef = ref(db, 'drillPlanFiles');
+      const snapshot = await get(filesRef);
+      
+      const files = snapshotToArray(snapshot)
+        .filter(file => file.commandId === commandId);
+        
+      return files.map(file => ({
+        ...file,
+        uploadedAt: new Date(file.uploadedAt)
+      }));
+    } catch (error) {
+      console.error('Error getting command files:', error);
+      return [];
+    }
   }
 
   async getFileById(id: string): Promise<DrillPlanFile | undefined> {
@@ -365,15 +398,21 @@ export class FirebaseStorage implements IStorage {
   }
 
   async getCommandNotes(commandId: string): Promise<DrillPlanNote[]> {
-    const notesRef = ref(db, 'drillPlanNotes');
-    const notesQuery = query(notesRef, orderByChild('commandId'), equalTo(commandId));
-    const snapshot = await get(notesQuery);
-    
-    const notes = snapshotToArray(snapshot);
-    return notes.map(note => ({
-      ...note,
-      createdAt: new Date(note.createdAt)
-    })).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    try {
+      const notesRef = ref(db, 'drillPlanNotes');
+      const snapshot = await get(notesRef);
+      
+      const notes = snapshotToArray(snapshot)
+        .filter(note => note.commandId === commandId);
+        
+      return notes.map(note => ({
+        ...note,
+        createdAt: new Date(note.createdAt)
+      })).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    } catch (error) {
+      console.error('Error getting command notes:', error);
+      return [];
+    }
   }
 
   async deleteCommandNote(id: string): Promise<boolean> {
@@ -388,31 +427,42 @@ export class FirebaseStorage implements IStorage {
 
   // Command execution history
   async getCommandExecutionHistory(commandId: string): Promise<CommandExecutionHistory[]> {
-    const historyRef = ref(db, 'commandExecutionHistory');
-    const historyQuery = query(historyRef, orderByChild('commandId'), equalTo(commandId));
-    const snapshot = await get(historyQuery);
-    
-    const history = snapshotToArray(snapshot);
-    return history.map(item => ({
-      ...item,
-      executedAt: new Date(item.executedAt)
-    })).sort((a, b) => b.executedAt.getTime() - a.executedAt.getTime());
+    try {
+      const historyRef = ref(db, 'commandExecutionHistory');
+      const snapshot = await get(historyRef);
+      
+      const history = snapshotToArray(snapshot)
+        .filter(item => item.commandId === commandId);
+        
+      return history.map(item => ({
+        ...item,
+        executedAt: new Date(item.executedAt)
+      })).sort((a, b) => b.executedAt.getTime() - a.executedAt.getTime());
+    } catch (error) {
+      console.error('Error getting command execution history:', error);
+      return [];
+    }
   }
 
   async getLastExecutionByFlight(commandId: string, flight: 'alpha' | 'tango'): Promise<CommandExecutionHistory | undefined> {
-    const historyRef = ref(db, 'commandExecutionHistory');
-    const snapshot = await get(historyRef);
-    const history = snapshotToArray(snapshot);
-    
-    const filtered = history
-      .filter(item => item.commandId === commandId && item.flightType === flight)
-      .map(item => ({
-        ...item,
-        executedAt: new Date(item.executedAt)
-      }))
-      .sort((a, b) => b.executedAt.getTime() - a.executedAt.getTime());
-    
-    return filtered.length > 0 ? filtered[0] : undefined;
+    try {
+      const historyRef = ref(db, 'commandExecutionHistory');
+      const snapshot = await get(historyRef);
+      const history = snapshotToArray(snapshot);
+      
+      const filtered = history
+        .filter(item => item.commandId === commandId && item.flightType === flight)
+        .map(item => ({
+          ...item,
+          executedAt: new Date(item.executedAt)
+        }))
+        .sort((a, b) => b.executedAt.getTime() - a.executedAt.getTime());
+      
+      return filtered.length > 0 ? filtered[0] : undefined;
+    } catch (error) {
+      console.error('Error getting last execution by flight:', error);
+      return undefined;
+    }
   }
 
   // Database management (adapted for Realtime Database)
